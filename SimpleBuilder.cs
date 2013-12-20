@@ -65,20 +65,20 @@ public class SimpleBuilder : ScriptableWizard
 	private void OnGUI()
 	{
 		EditorGUILayout.LabelField("Simple Project Builder v.0.0.3");
-        GUILayout.Space (10);
-        build_name = EditorGUILayout.TextField (build_name);
-        GUI.backgroundColor = Color.green;
-        if (GUILayout.Button ("Building " + build_name)) 
-        {
-			SaveDefines();
-            string build_path = "Build/PC/" + build_name + ".exe";
-            BuildPipeline.BuildPlayer (GetPaths (), build_path, build_type, build_options);
-            this.Close();
-        }
-        GUI.backgroundColor = Color.gray;
-        build_type = (BuildTarget)EditorGUILayout.EnumPopup ("Type:",build_type);
-        build_options = (BuildOptions)EditorGUILayout.EnumPopup ("Options:", build_options);
-        		
+	        GUILayout.Space (10);
+	        build_name = EditorGUILayout.TextField (build_name);
+	        GUI.backgroundColor = Color.green;
+	        if (GUILayout.Button ("Building " + build_name)) 
+	        {
+				SaveDefines();
+	            string build_path = "Build/PC/" + build_name + ".exe";
+	            BuildPipeline.BuildPlayer (GetPaths (), build_path, build_type, build_options);
+	            this.Close();
+	        }
+	        GUI.backgroundColor = Color.gray;
+	        build_type = (BuildTarget)EditorGUILayout.EnumPopup ("Type:",build_type);
+	        build_options = (BuildOptions)EditorGUILayout.EnumPopup ("Options:", build_options);
+	        		
 		var toRemove = new List<GlobalDefine>();
 		if( GUILayout.Button( "Add Define" ) )
 		{
@@ -93,31 +93,30 @@ public class SimpleBuilder : ScriptableWizard
 		foreach( var define in _globalDefines )
 		{
 			if( DefineEditor( define ) )
-				toRemove.Add( define );
+					toRemove.Add( define );
 		}
 		foreach( var define in toRemove )
 			_globalDefines.Remove( define );
 		GUILayout.Space( 10 );
 		EditorGUILayout.HelpBox ("Это тестовый пример сборщика проектов!", MessageType.Info);
 		EditorGUILayout.EndScrollView();
-
 	}
 	/// <summary>
 	/// Get all scenes paths.
 	/// </summary>
 	/// <returns>The scenes paths.</returns>
-    private string[] GetPaths()
-    {
-        string[] all_paths = AssetDatabase.GetAllAssetPaths();
-        List< string > paths = new List< string >();
-        for (int i = 0; i < all_paths.Length; i++)
-        {
-            if(all_paths[i].EndsWith(".unity"))
-                paths.Add(all_paths[i]);
+	private string[] GetPaths()
+    	{
+	        string[] all_paths = AssetDatabase.GetAllAssetPaths();
+	        List< string > paths = new List< string >();
+	        for (int i = 0; i < all_paths.Length; i++)
+	        {
+	            if(all_paths[i].EndsWith(".unity"))
+	                paths.Add(all_paths[i]);
+	        }
+	        string[] scenes_paths = paths.ToArray();
+	        return scenes_paths;
         }
-        string[] scenes_paths = paths.ToArray();
-        return scenes_paths;
-    }
 
 	private void SaveDefines()
 	{
