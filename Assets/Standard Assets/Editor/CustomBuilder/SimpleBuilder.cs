@@ -60,6 +60,7 @@ public class SimpleBuilder : ScriptableWizard
 			var formatter = new BinaryFormatter();
 			window._globalDefines = (List<GlobalDefine>)formatter.Deserialize( stream );
 		}
+		window.ShowUtility();
 	}
 
 	private void OnGUI()
