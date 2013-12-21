@@ -1,0 +1,14 @@
+**.pidb
+**.userprefs
+**.pdb
+**.suo
+**.app
+**.orig
+**.orig.meta
+**.user
+StyleCop.Cache/
+Library/
+Build/
+Temp/
+Thumbs.db
+Thumbs.db.meta
