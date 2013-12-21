@@ -12,3 +12,5 @@ Build/
 Temp/
 Thumbs.db
 Thumbs.db.meta
+*.sln
+*.csproj
