@@ -4,6 +4,11 @@
     Define Editor base on this script (need re-write):
     https://github.com/prime31/P31UnityAddOns/blob/master/Editor/GlobalDefinesWizard.cs
 */
+using System.Text;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
+
+
 #region using
 using System.IO;
 using System.Linq;
@@ -36,21 +41,29 @@ public class GlobalDefine : ISerializable
 	}
 }
 
-public class SimpleBuilder : ScriptableWizard
+public class CustomBuilder : EditorWindow
 {
+	private const string BuildConfigurationsDir = "BuildConfigurations/";
 	public List<GlobalDefine> _globalDefines = new List<GlobalDefine>();
-	private BuildTarget build_type = BuildTarget.StandaloneWindows;
-	private BuildOptions build_options = BuildOptions.None;
 	private const string saveKey = "userDefines";
-	private string build_name = "TestBuild";
 	private Vector2 pos = Vector2.zero;
+
+	[SerializeField]
+	private string _currentConfigurationName;
+	[SerializeField]
+	private string _currentConfigurationSerialized;
+	[SerializeField]
+	private bool _currentConfigurationDirty;
+
+	private CustomBuilderConfiguration _currentConfiguration;
 	
-	[MenuItem( "Builder/Simple Builder %#1", false, 0 )]
-	static void CreateBuilderWindow()
+	[MenuItem("Window/Builder %#1")]
+	private static void OpenWindow()
 	{
-		var window = ScriptableWizard.DisplayWizard<SimpleBuilder>( "Simple Builder", "Save", "Cancel" );
+		var window = EditorWindow.GetWindow<CustomBuilder>(true, "Builder");
 		window.minSize = new Vector2( 300, 400 );
 		window.maxSize = new Vector2( 300, 400 );
+
 		if( EditorPrefs.HasKey( saveKey ) )
 		{
 			var data = EditorPrefs.GetString( saveKey );
@@ -60,25 +73,78 @@ public class SimpleBuilder : ScriptableWizard
 			var formatter = new BinaryFormatter();
 			window._globalDefines = (List<GlobalDefine>)formatter.Deserialize( stream );
 		}
-		window.ShowUtility();
+		window.Show();
+	}
+
+	private void OnEnable()
+	{
+		if (!string.IsNullOrEmpty(this._currentConfigurationSerialized))
+		{
+			this._currentConfiguration = new CustomBuilderConfiguration();
+			this._currentConfiguration.FromJson(JObject.Parse(this._currentConfigurationSerialized));
+		}
+		else
+		{
+			this._currentConfiguration = null;
+		}
+
+		this._currentConfigurationSerialized = null;
+	}
+
+	private void OnDisable()
+	{
+		if (this._currentConfiguration != null)
+		{
+			this._currentConfigurationSerialized = this._currentConfiguration.ToJson().ToString();
+		}
+		else
+		{
+			this._currentConfigurationSerialized = null;
+		}
+
+		this._currentConfigurationSerialized = null;
 	}
 
 	private void OnGUI()
 	{
-		EditorGUILayout.LabelField("Simple Project Builder v.0.0.3");
-	        GUILayout.Space (10);
-	        build_name = EditorGUILayout.TextField (build_name);
-	        GUI.backgroundColor = Color.green;
-	        if (GUILayout.Button ("Building " + build_name)) 
-	        {
-				SaveDefines();
-	            string build_path = "Build/PC/" + build_name + ".exe";
-	            BuildPipeline.BuildPlayer (GetPaths (), build_path, build_type, build_options);
-	            this.Close();
-	        }
-	        GUI.backgroundColor = Color.gray;
-	        build_type = (BuildTarget)EditorGUILayout.EnumPopup ("Type:",build_type);
-	        build_options = (BuildOptions)EditorGUILayout.EnumPopup ("Options:", build_options);
+		var configs = this.GetConfigurations();
+
+		EditorGUILayout.LabelField("Custom Project Builder v.0.0.3");
+	   	GUILayout.Space(10);
+
+		int oldConfigIndex = this._currentConfigurationName != null ? System.Array.IndexOf(configs, this._currentConfigurationName) : -1;
+		int newConfigIndex = EditorGUILayout.Popup(
+			oldConfigIndex,
+			configs
+		);
+		if (newConfigIndex != oldConfigIndex)
+		{
+			this._currentConfigurationName = newConfigIndex != -1 ? configs[newConfigIndex] : null;
+			this._currentConfiguration = null;
+		}
+
+		EditorGUILayout.BeginHorizontal();
+		if (GUILayout.Button("New"))
+		{
+			this.CreateNewConfiguration();
+		}
+		if (GUILayout.Button(this._currentConfiguration != null && this._currentConfigurationDirty ? "Save*" : "Save"))
+		{
+			this.SaveCurrentConfiguration();
+		}
+		EditorGUILayout.EndHorizontal();
+
+		if (this._currentConfiguration == null && this._currentConfigurationName != null)
+		{
+			this._currentConfiguration = this.LoadConfiguration(this._currentConfigurationName);
+			this._currentConfigurationDirty = false;
+		}
+
+		if (this._currentConfiguration != null)
+		{
+			this._currentConfigurationDirty |= this._currentConfiguration.OnGUI();
+		}
+	       
 	        		
 		var toRemove = new List<GlobalDefine>();
 		if( GUILayout.Button( "Add Define" ) )
@@ -101,7 +167,105 @@ public class SimpleBuilder : ScriptableWizard
 		GUILayout.Space( 10 );
 		EditorGUILayout.HelpBox ("Это тестовый пример сборщика проектов!", MessageType.Info);
 		EditorGUILayout.EndScrollView();
+
+		GUI.backgroundColor = Color.green;
+		if (this._currentConfiguration != null)
+		{
+			if (GUILayout.Button("Build " + this._currentConfiguration.name))
+			{
+				SaveDefines();
+				this.Build(this._currentConfiguration);
+				this.Close();
+			}
+		}
 	}
+
+	public void Build(CustomBuilderConfiguration config)
+	{
+		BuildPipeline.BuildPlayer(
+			config.scenesInBuild.ToArray(),
+			config.buildPath,
+			config.buildTarget,
+			config.buildOptions
+		);
+	}
+
+	private CustomBuilderConfiguration LoadConfiguration(string name)
+	{
+		var config = new CustomBuilderConfiguration();
+
+		string path = BuildConfigurationsDir + name + ".json";
+		if (File.Exists(path))
+		{
+			config.name = name;
+			config.FromJson(JObject.Parse(File.ReadAllText(path)));
+		}
+		else
+		{
+			config.InitializeNew(name);
+		}
+
+		return config;
+	}
+
+	private string[] GetConfigurations()
+	{
+		if (!Directory.Exists(BuildConfigurationsDir))
+		{
+			return new string[0];
+		}
+
+		return Directory.GetFiles(BuildConfigurationsDir, "*.json").Select(x => Path.GetFileNameWithoutExtension(x)).ToArray();
+	}
+
+	private void CreateNewConfiguration()
+	{
+		string nameBase = "Build";
+		string name = nameBase;
+		string path = null;
+		int i = 0;
+		while (true)
+		{
+			path = BuildConfigurationsDir + name + ".json";
+			if (!File.Exists(path))
+			{
+				break;
+			}
+
+			name = nameBase + (++i).ToString();
+		}
+
+		var config = new CustomBuilderConfiguration();
+		config.InitializeNew(name);
+		File.WriteAllText(path, config.ToJson().ToString(Newtonsoft.Json.Formatting.Indented), Encoding.UTF8);
+
+		this._currentConfigurationName = name;
+		this._currentConfiguration = config;
+		this._currentConfigurationDirty = false;
+	}
+
+	private void SaveCurrentConfiguration()
+	{
+		if (this._currentConfiguration == null || string.IsNullOrEmpty(this._currentConfiguration.name))
+		{
+			return;
+		}
+
+		if (this._currentConfigurationName != this._currentConfiguration.name)
+		{
+			string oldPath = BuildConfigurationsDir + this._currentConfigurationName + ".json";
+			if (File.Exists(oldPath))
+			{
+				File.Delete(oldPath);
+			}
+		}
+
+		this._currentConfigurationName = this._currentConfiguration.name;
+		string newPath = BuildConfigurationsDir + this._currentConfigurationName + ".json";
+		File.WriteAllText(newPath, this._currentConfiguration.ToJson().ToString(Formatting.Indented), Encoding.UTF8);
+		this._currentConfigurationDirty = false;
+	}
+
 	/// <summary>
 	/// Get all scenes paths.
 	/// </summary>
@@ -118,6 +282,8 @@ public class SimpleBuilder : ScriptableWizard
 	        string[] scenes_paths = paths.ToArray();
 	        return scenes_paths;
         }
+
+
 
 	private void SaveDefines()
 	{
