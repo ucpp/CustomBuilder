@@ -44,6 +44,8 @@ public class GlobalDefine : ISerializable
 public class CustomBuilder : EditorWindow
 {
 	private const string BuildConfigurationsDir = "BuildConfigurations/";
+
+
 	public List<GlobalDefine> _globalDefines = new List<GlobalDefine>();
 	private const string saveKey = "userDefines";
 	private Vector2 pos = Vector2.zero;
@@ -54,6 +56,8 @@ public class CustomBuilder : EditorWindow
 	private string _currentConfigurationSerialized;
 	[SerializeField]
 	private bool _currentConfigurationDirty;
+	[SerializeField]
+	private string _currentModule;
 
 	private CustomBuilderConfiguration _currentConfiguration;
 	
@@ -94,8 +98,10 @@ public class CustomBuilder : EditorWindow
 	private void OnDisable()
 	{
 		if (this._currentConfiguration != null)
-		{
-			this._currentConfigurationSerialized = this._currentConfiguration.ToJson().ToString();
+		{					
+			var obj = new JObject();
+			this._currentConfiguration.ToJson(obj);
+			this._currentConfigurationSerialized = obj.ToString();
 		}
 		else
 		{
@@ -139,13 +145,26 @@ public class CustomBuilder : EditorWindow
 			this._currentConfiguration = this.LoadConfiguration(this._currentConfigurationName);
 			this._currentConfigurationDirty = false;
 		}
+			
+		if (this._currentConfiguration != null)
+		{
+			var bg = GUI.backgroundColor;
+			GUI.backgroundColor = Color.green;
+			if (GUILayout.Button("Build " + this._currentConfiguration.name))
+			{
+				SaveDefines();
+				this._currentConfiguration.Build();
+				this.Close();
+			}
+			GUI.backgroundColor = bg;
+		}
 
 		if (this._currentConfiguration != null)
 		{
 			this._currentConfigurationDirty |= this._currentConfiguration.OnGUI();
 		}
 	       
-	        		
+
 		var toRemove = new List<GlobalDefine>();
 		if( GUILayout.Button( "Add Define" ) )
 		{
@@ -168,26 +187,24 @@ public class CustomBuilder : EditorWindow
 		EditorGUILayout.HelpBox ("Это тестовый пример сборщика проектов!", MessageType.Info);
 		EditorGUILayout.EndScrollView();
 
-		GUI.backgroundColor = Color.green;
 		if (this._currentConfiguration != null)
 		{
-			if (GUILayout.Button("Build " + this._currentConfiguration.name))
-			{
-				SaveDefines();
-				this.Build(this._currentConfiguration);
-				this.Close();
-			}
-		}
-	}
+			EditorGUILayout.BeginHorizontal();
+			var modules = CustomBuilderModule.GetModules();
+			var module = CustomBuilderModule.GetModule(this._currentModule);
+			int oldModuleIndex = modules.IndexOf(module);
+			int newModuleIndex = EditorGUILayout.Popup(oldModuleIndex, modules.ConvertAll(x => x.description).ToArray());
+			module = newModuleIndex >= 0 ? modules[newModuleIndex] : null;
+			this._currentModule = module != null ? module.name : null;
 
-	public void Build(CustomBuilderConfiguration config)
-	{
-		BuildPipeline.BuildPlayer(
-			config.scenesInBuild.ToArray(),
-			config.buildPath,
-			config.buildTarget,
-			config.buildOptions
-		);
+			if (GUILayout.Button("+") && module != null)
+			{
+				this._currentConfiguration.AddModule(module);
+				this._currentConfigurationDirty = true;
+			}
+
+			EditorGUILayout.EndHorizontal();
+		}
 	}
 
 	private CustomBuilderConfiguration LoadConfiguration(string name)
@@ -237,7 +254,9 @@ public class CustomBuilder : EditorWindow
 
 		var config = new CustomBuilderConfiguration();
 		config.InitializeNew(name);
-		File.WriteAllText(path, config.ToJson().ToString(Newtonsoft.Json.Formatting.Indented), Encoding.UTF8);
+		var obj = new JObject();
+		config.ToJson(obj);
+		File.WriteAllText(path, obj.ToString(Newtonsoft.Json.Formatting.Indented), Encoding.UTF8);
 
 		this._currentConfigurationName = name;
 		this._currentConfiguration = config;
@@ -262,7 +281,9 @@ public class CustomBuilder : EditorWindow
 
 		this._currentConfigurationName = this._currentConfiguration.name;
 		string newPath = BuildConfigurationsDir + this._currentConfigurationName + ".json";
-		File.WriteAllText(newPath, this._currentConfiguration.ToJson().ToString(Formatting.Indented), Encoding.UTF8);
+		var obj = new JObject();
+		this._currentConfiguration.ToJson(obj);
+		File.WriteAllText(newPath, obj.ToString(Formatting.Indented), Encoding.UTF8);
 		this._currentConfigurationDirty = false;
 	}
 
