@@ -46,10 +46,12 @@ namespace CustomBuilderModules
 ```
 
 * **OnBeforeBuild** - is fired first after the main configuration is set but before the build.
-* **OnBuild** - is fired before the build but after all *OnBeforeBuild* are called. It can be used to check the options set by other modules in *OnBeforeBuild*
-* **OnAfterBuild** - is fired after the build is done
+* **OnBuild** - is fired before the build but after all *OnBeforeBuild* are called. It can be used to check the options set by other modules in *OnBeforeBuild*.
+* **OnAfterBuild** - is fired after the build is done.
 
-* **FromJson** - is used to load module settings from stored data
-* **ToJson** - is used to store module settings to JSON file
 
-* **OnGUI** - is used to draw GUI for module settings in the builder window
+* **FromJson** - is used to load module settings from stored data.
+* **ToJson** - is used to store module settings to JSON file.
+
+
+* **OnGUI** - is used to draw GUI for module settings in the builder window.
