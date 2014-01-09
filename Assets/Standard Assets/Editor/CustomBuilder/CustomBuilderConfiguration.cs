@@ -5,6 +5,7 @@ using Newtonsoft.Json.Linq;
 using System.Collections.Generic;
 using System.Text;
 using System.ComponentModel;
+using System.IO;
 
 
 [Browsable(false)]
@@ -50,6 +51,7 @@ public enum CustomBuilderBuildOptions
 {
 	None = 0,
 	Development = 1,
+	Unknown = 2,
 	AutoRunPlayer = 4,
 	ShowBuiltPlayer = 8,
 	BuildAdditionalStreamedScenes = 16,
@@ -187,6 +189,8 @@ public class CustomBuilderConfiguration
 		this.buildTarget = (BuildTarget)EditorGUILayout.EnumPopup("Type", this.buildTarget);
 		this.buildOptions = (CustomBuilderBuildOptions)EditorGUILayout.EnumMaskField("Options", this.buildOptions);
 
+
+		List<CustomBuilderModule> moduleToRemove = null;
 		foreach (var m in this._modules)
 		{
 			var info = CustomBuilderModule.GetModule(m.name);
@@ -196,13 +200,31 @@ public class CustomBuilderConfiguration
 			}
 			else
 			{
+				EditorGUILayout.BeginHorizontal();
 				m.isCollapsed = !EditorGUILayout.Foldout(!m.isCollapsed, info.description);
+				if (GUILayout.Button("Delete"))
+				{
+					if (moduleToRemove == null)
+					{
+						moduleToRemove = new List<CustomBuilderModule>(1);
+					}
+					moduleToRemove.Add(m);
+				}
+				EditorGUILayout.EndHorizontal();
 				if (!m.isCollapsed)
 				{
 					EditorGUI.indentLevel++;
 					m.OnGUI();
 					EditorGUI.indentLevel--;
 				}
+			}
+		}
+			
+		if (moduleToRemove != null)
+		{
+			foreach (var m in moduleToRemove)
+			{
+				this._modules.Remove(m);
 			}
 		}
 
@@ -234,6 +256,12 @@ public class CustomBuilderConfiguration
 		foreach (var m in this._modules)
 		{
 			m.OnBuild(config);
+		}
+
+		var dir = Path.GetDirectoryName(config.buildPath);
+		if (!Directory.Exists(dir))
+		{
+			Directory.CreateDirectory(dir);
 		}
 
 		BuildPipeline.BuildPlayer(config.scenes.ToArray(), config.buildPath, config.buildTarget, config.buildOptions);

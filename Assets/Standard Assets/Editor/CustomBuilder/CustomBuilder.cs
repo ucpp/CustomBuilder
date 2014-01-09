@@ -51,13 +51,13 @@ public class CustomBuilder : EditorWindow
 	private Vector2 pos = Vector2.zero;
 
 	[SerializeField]
+	private bool _initialized;
+	[SerializeField]
 	private string _currentConfigurationName;
 	[SerializeField]
 	private string _currentConfigurationSerialized;
 	[SerializeField]
 	private bool _currentConfigurationDirty;
-	[SerializeField]
-	private string _currentModule;
 
 	private CustomBuilderConfiguration _currentConfiguration;
 	
@@ -82,6 +82,13 @@ public class CustomBuilder : EditorWindow
 
 	private void OnEnable()
 	{
+		if (!this._initialized)
+		{
+			this._currentConfigurationName = EditorPrefs.GetString("CustomBuilder.CurrentConfig", null);
+			this._initialized = true;
+			return;
+		}
+
 		if (!string.IsNullOrEmpty(this._currentConfigurationSerialized))
 		{
 			this._currentConfiguration = new CustomBuilderConfiguration();
@@ -127,6 +134,15 @@ public class CustomBuilder : EditorWindow
 		{
 			this._currentConfigurationName = newConfigIndex != -1 ? configs[newConfigIndex] : null;
 			this._currentConfiguration = null;
+		}
+
+		if (this._currentConfigurationName != null)
+		{
+			EditorPrefs.SetString("CustomBuilder.CurrentConfig", this._currentConfigurationName);
+		}
+		else
+		{
+			EditorPrefs.DeleteKey("CustomBuilder.CurrentConfig");
 		}
 
 		EditorGUILayout.BeginHorizontal();
@@ -189,21 +205,15 @@ public class CustomBuilder : EditorWindow
 
 		if (this._currentConfiguration != null)
 		{
-			EditorGUILayout.BeginHorizontal();
 			var modules = CustomBuilderModule.GetModules();
-			var module = CustomBuilderModule.GetModule(this._currentModule);
-			int oldModuleIndex = modules.IndexOf(module);
-			int newModuleIndex = EditorGUILayout.Popup(oldModuleIndex, modules.ConvertAll(x => x.description).ToArray());
-			module = newModuleIndex >= 0 ? modules[newModuleIndex] : null;
-			this._currentModule = module != null ? module.name : null;
+			int moduleIndex = EditorGUILayout.Popup("Add Module", -1, modules.ConvertAll(x => x.description).ToArray());
+			var module = moduleIndex >= 0 ? modules[moduleIndex] : null;
 
-			if (GUILayout.Button("+") && module != null)
+			if (module != null)
 			{
 				this._currentConfiguration.AddModule(module);
 				this._currentConfigurationDirty = true;
 			}
-
-			EditorGUILayout.EndHorizontal();
 		}
 	}
 
