@@ -1,53 +1,25 @@
 ﻿/*
 	Add your name and your e-mail
     Programming: Maryan Yaroma, yaroma.maryan@gmail.com 
-    Define Editor base on this script (need re-write):
-    https://github.com/prime31/P31UnityAddOns/blob/master/Editor/GlobalDefinesWizard.cs
+				 Dmitriy Pyalov, dipyalov@gmail.com
 */
-using System.Text;
-using Newtonsoft.Json.Linq;
-using Newtonsoft.Json;
-
-
-#region using
+using System;
 using System.IO;
 using System.Linq;
+using System.Text;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEditor;
-using System.Collections;
-using System.Collections.Generic;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Formatters.Binary;
-#endregion
-// TODO : re-write defines editor realisation
-[System.Serializable]
-public class GlobalDefine : ISerializable
-{
-	public string define;
-	public bool enabled;
-	
-	public GlobalDefine() { }
-	
-	protected GlobalDefine( SerializationInfo info, StreamingContext context )
-	{
-		define = info.GetString( "define" );
-		enabled = info.GetBoolean( "enabled" );
-	}
-	
-	public void GetObjectData( SerializationInfo info, StreamingContext context )
-	{
-		info.AddValue( "define", define );
-		info.AddValue( "enabled", enabled );
-	}
-}
+
 
 public class CustomBuilder : EditorWindow
 {
 	private const string BuildConfigurationsDir = "BuildConfigurations/";
-	public List<GlobalDefine> _globalDefines = new List<GlobalDefine>();
-	private const string saveKey = "userDefines";
-	private Vector2 pos = Vector2.zero;
+	private const string CurrentConfigPref = "CustomBuilder.CurrentConfig";
 
+	[SerializeField]
+	private bool _initialized;
 	[SerializeField]
 	private string _currentConfigurationName;
 	[SerializeField]
@@ -56,28 +28,138 @@ public class CustomBuilder : EditorWindow
 	private bool _currentConfigurationDirty;
 
 	private CustomBuilderConfiguration _currentConfiguration;
+	private Vector2 _scrollPos;
+
+	public static BuildTargetGroup GetBuildTargetGroup(BuildTarget buildTarget)
+	{
+		if (buildTarget == BuildTarget.WebPlayer 
+		 	|| buildTarget == BuildTarget.WebPlayerStreamed)
+		{
+			return BuildTargetGroup.WebPlayer;
+		}
+
+		if (buildTarget == BuildTarget.StandaloneOSXIntel 
+			|| buildTarget == BuildTarget.StandaloneOSXIntel64
+			|| buildTarget == BuildTarget.StandaloneOSXUniversal
+			|| buildTarget == BuildTarget.StandaloneWindows
+			|| buildTarget == BuildTarget.StandaloneWindows64
+			|| buildTarget == BuildTarget.StandaloneLinux
+			|| buildTarget == BuildTarget.StandaloneLinux64
+			|| buildTarget == BuildTarget.StandaloneLinuxUniversal)
+		{
+			return BuildTargetGroup.Standalone;
+		}
+
+		if (buildTarget == BuildTarget.StandaloneGLESEmu)
+		{
+			return BuildTargetGroup.GLESEmu;
+		}
+
+		if (buildTarget == BuildTarget.iPhone)
+		{
+			return BuildTargetGroup.iPhone;
+		}
+
+		if (buildTarget == BuildTarget.PS3)
+		{
+			return BuildTargetGroup.PS3;
+		}
+
+		if (buildTarget == BuildTarget.XBOX360)
+		{
+			return BuildTargetGroup.XBOX360;
+		}
+
+		if (buildTarget == BuildTarget.Android)
+		{
+			return BuildTargetGroup.Android;
+		}
+
+		if (buildTarget == BuildTarget.Wii)
+		{
+			return BuildTargetGroup.Wii;
+		}
+
+		if (buildTarget == BuildTarget.NaCl)
+		{
+			return BuildTargetGroup.NaCl;
+		}
+
+		if (buildTarget == BuildTarget.FlashPlayer)
+		{
+			return BuildTargetGroup.FlashPlayer;
+		}
+
+		if (buildTarget == BuildTarget.MetroPlayer)
+		{
+			return BuildTargetGroup.Metro;
+		}
+
+		if (buildTarget == BuildTarget.WP8Player)
+		{
+			return BuildTargetGroup.WP8;
+		}
+
+		if (buildTarget == BuildTarget.BB10)
+		{
+			return BuildTargetGroup.BB10;
+		}
+
+		return BuildTargetGroup.Unknown;
+	}
 	
-	[MenuItem("Window/Builder %#1")]
+	[MenuItem("Window/Builder... %#1")]
 	private static void OpenWindow()
 	{
-		var window = EditorWindow.GetWindow<CustomBuilder>(true, "Builder");
-		window.minSize = new Vector2( 300, 400 );
-		window.maxSize = new Vector2( 300, 400 );
-
-		if( EditorPrefs.HasKey( saveKey ) )
-		{
-			var data = EditorPrefs.GetString( saveKey );
-			var bytes = System.Convert.FromBase64String( data );
-			var stream = new MemoryStream( bytes );
-			
-			var formatter = new BinaryFormatter();
-			window._globalDefines = (List<GlobalDefine>)formatter.Deserialize( stream );
-		}
+		var window = EditorWindow.GetWindow<CustomBuilder>(true, "Custom Builder");
 		window.Show();
+	}
+	[MenuItem("Window/Build Current %#&1")]
+	private static void BuildCurrent()
+	{
+		string name = EditorPrefs.GetString(CurrentConfigPref, null);
+		if (string.IsNullOrEmpty(name))
+		{
+			return;
+		}
+		string path = BuildConfigurationsDir + name + ".json";
+		if (!File.Exists(path))
+		{
+			return;
+		}
+
+		var config = new CustomBuilderConfiguration();
+		config.name = name;
+		config.FromJson(JObject.Parse(File.ReadAllText(path)));
+		config.Build();
+	}
+
+	[MenuItem("Window/Build Current %#&1", true)]
+	private static bool Validate()
+	{
+		string name = EditorPrefs.GetString(CurrentConfigPref, null);
+		if (string.IsNullOrEmpty(name))
+		{
+			return false;
+		}
+		string path = BuildConfigurationsDir + name + ".json";
+		if (!File.Exists(path))
+		{
+			return false;
+		}
+
+		return true;
 	}
 
 	private void OnEnable()
 	{
+		if (!this._initialized)
+		{
+			this._currentConfigurationName = EditorPrefs.GetString(CurrentConfigPref, null);
+			this._initialized = true;
+			return;
+		}
+
 		if (!string.IsNullOrEmpty(this._currentConfigurationSerialized))
 		{
 			this._currentConfiguration = new CustomBuilderConfiguration();
@@ -94,8 +176,10 @@ public class CustomBuilder : EditorWindow
 	private void OnDisable()
 	{
 		if (this._currentConfiguration != null)
-		{
-			this._currentConfigurationSerialized = this._currentConfiguration.ToJson().ToString();
+		{					
+			var obj = new JObject();
+			this._currentConfiguration.ToJson(obj);
+			this._currentConfigurationSerialized = obj.ToString();
 		}
 		else
 		{
@@ -109,9 +193,6 @@ public class CustomBuilder : EditorWindow
 	{
 		var configs = this.GetConfigurations();
 
-		EditorGUILayout.LabelField("Custom Project Builder v.0.0.3");
-	   	GUILayout.Space(10);
-
 		int oldConfigIndex = this._currentConfigurationName != null ? System.Array.IndexOf(configs, this._currentConfigurationName) : -1;
 		int newConfigIndex = EditorGUILayout.Popup(
 			oldConfigIndex,
@@ -123,15 +204,32 @@ public class CustomBuilder : EditorWindow
 			this._currentConfiguration = null;
 		}
 
+		if (this._currentConfigurationName != null)
+		{
+			EditorPrefs.SetString(CurrentConfigPref, this._currentConfigurationName);
+		}
+		else
+		{
+			EditorPrefs.DeleteKey(CurrentConfigPref);
+		}
+
 		EditorGUILayout.BeginHorizontal();
 		if (GUILayout.Button("New"))
 		{
 			this.CreateNewConfiguration();
 		}
+
+		var bg = GUI.backgroundColor;
+		if (this._currentConfiguration != null && this._currentConfigurationDirty)
+		{
+			GUI.backgroundColor = Color.yellow;
+		}
 		if (GUILayout.Button(this._currentConfiguration != null && this._currentConfigurationDirty ? "Save*" : "Save"))
 		{
 			this.SaveCurrentConfiguration();
 		}
+		GUI.backgroundColor = bg;
+
 		EditorGUILayout.EndHorizontal();
 
 		if (this._currentConfiguration == null && this._currentConfigurationName != null)
@@ -139,55 +237,37 @@ public class CustomBuilder : EditorWindow
 			this._currentConfiguration = this.LoadConfiguration(this._currentConfigurationName);
 			this._currentConfigurationDirty = false;
 		}
+			
+		if (this._currentConfiguration != null)
+		{
+			bg = GUI.backgroundColor;
+			GUI.backgroundColor = Color.green;
+			if (GUILayout.Button("Build " + this._currentConfiguration.name))
+			{
+				this._currentConfiguration.Build();
+			}
+			GUI.backgroundColor = bg;
+		}
 
+		this._scrollPos = EditorGUILayout.BeginScrollView(this._scrollPos);
 		if (this._currentConfiguration != null)
 		{
 			this._currentConfigurationDirty |= this._currentConfiguration.OnGUI();
 		}
-	       
-	        		
-		var toRemove = new List<GlobalDefine>();
-		if( GUILayout.Button( "Add Define" ) )
-		{
-			var d = new GlobalDefine();
-			d.define = "NEW_DEFINE";
-			d.enabled = false;
-			_globalDefines.Add( d );
-			pos.y += 20;
-		}
-		GUILayout.Space (10);
-		pos = EditorGUILayout.BeginScrollView(pos);
-		foreach( var define in _globalDefines )
-		{
-			if( DefineEditor( define ) )
-					toRemove.Add( define );
-		}
-		foreach( var define in toRemove )
-			_globalDefines.Remove( define );
-		GUILayout.Space( 10 );
-		EditorGUILayout.HelpBox ("Это тестовый пример сборщика проектов!", MessageType.Info);
 		EditorGUILayout.EndScrollView();
-
-		GUI.backgroundColor = Color.green;
+	       
 		if (this._currentConfiguration != null)
 		{
-			if (GUILayout.Button("Build " + this._currentConfiguration.name))
+			var modules = CustomBuilderModule.GetModules();
+			int moduleIndex = EditorGUILayout.Popup("Add Module", -1, modules.ConvertAll(x => x.description).ToArray());
+			var module = moduleIndex >= 0 ? modules[moduleIndex] : null;
+
+			if (module != null)
 			{
-				SaveDefines();
-				this.Build(this._currentConfiguration);
-				this.Close();
+				this._currentConfiguration.AddModule(module);
+				this._currentConfigurationDirty = true;
 			}
 		}
-	}
-
-	public void Build(CustomBuilderConfiguration config)
-	{
-		BuildPipeline.BuildPlayer(
-			config.scenesInBuild.ToArray(),
-			config.buildPath,
-			config.buildTarget,
-			config.buildOptions
-		);
 	}
 
 	private CustomBuilderConfiguration LoadConfiguration(string name)
@@ -237,7 +317,9 @@ public class CustomBuilder : EditorWindow
 
 		var config = new CustomBuilderConfiguration();
 		config.InitializeNew(name);
-		File.WriteAllText(path, config.ToJson().ToString(Newtonsoft.Json.Formatting.Indented), Encoding.UTF8);
+		var obj = new JObject();
+		config.ToJson(obj);
+		File.WriteAllText(path, obj.ToString(Newtonsoft.Json.Formatting.Indented), Encoding.UTF8);
 
 		this._currentConfigurationName = name;
 		this._currentConfiguration = config;
@@ -262,108 +344,9 @@ public class CustomBuilder : EditorWindow
 
 		this._currentConfigurationName = this._currentConfiguration.name;
 		string newPath = BuildConfigurationsDir + this._currentConfigurationName + ".json";
-		File.WriteAllText(newPath, this._currentConfiguration.ToJson().ToString(Formatting.Indented), Encoding.UTF8);
+		var obj = new JObject();
+		this._currentConfiguration.ToJson(obj);
+		File.WriteAllText(newPath, obj.ToString(Formatting.Indented), Encoding.UTF8);
 		this._currentConfigurationDirty = false;
 	}
-
-	/// <summary>
-	/// Get all scenes paths.
-	/// </summary>
-	/// <returns>The scenes paths.</returns>
-	private string[] GetPaths()
-    	{
-	        string[] all_paths = AssetDatabase.GetAllAssetPaths();
-	        List< string > paths = new List< string >();
-	        for (int i = 0; i < all_paths.Length; i++)
-	        {
-	            if(all_paths[i].EndsWith(".unity"))
-	                paths.Add(all_paths[i]);
-	        }
-	        string[] scenes_paths = paths.ToArray();
-	        return scenes_paths;
-        }
-
-
-
-	private void SaveDefines()
-	{
-		if( _globalDefines.Count == 0 )
-		{
-			DeleteFiles();
-			EditorPrefs.DeleteKey( saveKey );
-			Close();
-			return;
-		}
-		var formatter = new BinaryFormatter();
-		using( var stream = new MemoryStream() )
-		{
-			formatter.Serialize( stream, _globalDefines );
-			var data = System.Convert.ToBase64String( stream.ToArray() );
-			stream.Close();
-			
-			EditorPrefs.SetString( saveKey, data );
-		}
-		var toDisk = _globalDefines.Where( d => d.enabled ).Select( d => d.define ).ToArray();
-		if( toDisk.Length > 0 )
-		{
-			var builder = new System.Text.StringBuilder( "-define:" );
-			for( var i = 0; i < toDisk.Length; i++ )
-			{
-				if( i < toDisk.Length - 1 )
-					builder.AppendFormat( "{0};", toDisk[i] );
-				else
-					builder.Append( toDisk[i] );
-			}
-			WriteFiles( builder.ToString() );
-			AssetDatabase.Refresh();
-			ReimportSomethingToForceRecompile();
-		}
-		else
-			DeleteFiles();
-	}
-
-	private void ReimportSomethingToForceRecompile()
-	{
-		var dataPathDir = new DirectoryInfo( Application.dataPath );
-		var dataPathUri = new System.Uri( Application.dataPath );
-		foreach( var file in dataPathDir.GetFiles( "SimpleBuilder.cs", SearchOption.AllDirectories ) )
-		{
-			var relativeUri = dataPathUri.MakeRelativeUri( new System.Uri( file.FullName ) );
-			var relativePath = System.Uri.UnescapeDataString( relativeUri.ToString() );
-			AssetDatabase.ImportAsset( relativePath, ImportAssetOptions.ForceUpdate );
-		}
-	}
-
-	private void DeleteFiles()
-	{
-		var smcsFile = Path.Combine( Application.dataPath, "smcs.rsp" );
-		var gmcsFile = Path.Combine( Application.dataPath, "gmcs.rsp" );
-		
-		if( File.Exists( smcsFile ) )
-			File.Delete( smcsFile );
-		
-		if( File.Exists( gmcsFile ) )
-			File.Delete( gmcsFile );
-	}
-
-	private void WriteFiles( string data )
-	{
-		var smcsFile = Path.Combine( Application.dataPath, "smcs.rsp" );
-		var gmcsFile = Path.Combine( Application.dataPath, "gmcs.rsp" );
-	
-		File.WriteAllText( smcsFile, data );
-		File.WriteAllText( gmcsFile, data );
-	}
-
-	private bool DefineEditor( GlobalDefine define )
-	{
-		EditorGUILayout.BeginHorizontal();
-		define.define = EditorGUILayout.TextField( define.define );
-		define.enabled = EditorGUILayout.Toggle( define.enabled );
-		var remove = false;
-		if( GUILayout.Button( "Remove" ) )
-			remove = true;
-		EditorGUILayout.EndHorizontal();
-		return remove;
-	}	
 }
