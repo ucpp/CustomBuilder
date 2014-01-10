@@ -346,6 +346,11 @@ public class CustomBuilder : EditorWindow
 		string newPath = BuildConfigurationsDir + this._currentConfigurationName + ".json";
 		var obj = new JObject();
 		this._currentConfiguration.ToJson(obj);
+		string dir = Path.GetDirectoryName(newPath);
+		if (!Directory.Exists(dir))
+		{
+			Directory.CreateDirectory(dir);
+		}
 		File.WriteAllText(newPath, obj.ToString(Formatting.Indented), Encoding.UTF8);
 		this._currentConfigurationDirty = false;
 	}
