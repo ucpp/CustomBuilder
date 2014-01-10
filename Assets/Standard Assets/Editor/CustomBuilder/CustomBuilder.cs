@@ -1,6 +1,6 @@
 ﻿/*
 	Add your name and your e-mail
-    Programming: Maryan Yaroma, yaroma.maryan@gmail.com 
+	Programming: Maryan Yaroma, yaroma.maryan@gmail.com 
 				 Dmitriy Pyalov, dipyalov@gmail.com
 */
 using System;
@@ -33,7 +33,7 @@ public class CustomBuilder : EditorWindow
 	public static BuildTargetGroup GetBuildTargetGroup(BuildTarget buildTarget)
 	{
 		if (buildTarget == BuildTarget.WebPlayer 
-		 	|| buildTarget == BuildTarget.WebPlayerStreamed)
+			|| buildTarget == BuildTarget.WebPlayerStreamed)
 		{
 			return BuildTargetGroup.WebPlayer;
 		}
@@ -108,13 +108,13 @@ public class CustomBuilder : EditorWindow
 		return BuildTargetGroup.Unknown;
 	}
 	
-	[MenuItem("Window/Builder... %#1")]
+	[MenuItem("Window/Builder... %#&B")]
 	private static void OpenWindow()
 	{
 		var window = EditorWindow.GetWindow<CustomBuilder>(true, "Custom Builder");
 		window.Show();
 	}
-	[MenuItem("Window/Build Current %#&1")]
+	[MenuItem("Window/Build Current #&B")]
 	private static void BuildCurrent()
 	{
 		string name = EditorPrefs.GetString(CurrentConfigPref, null);
@@ -190,7 +190,7 @@ public class CustomBuilder : EditorWindow
 	}
 
 	private void OnGUI()
-	{
+	{		
 		var configs = this.GetConfigurations();
 
 		int oldConfigIndex = this._currentConfigurationName != null ? System.Array.IndexOf(configs, this._currentConfigurationName) : -1;
@@ -237,14 +237,14 @@ public class CustomBuilder : EditorWindow
 			this._currentConfiguration = this.LoadConfiguration(this._currentConfigurationName);
 			this._currentConfigurationDirty = false;
 		}
-			
+
 		if (this._currentConfiguration != null)
 		{
 			bg = GUI.backgroundColor;
 			GUI.backgroundColor = Color.green;
 			if (GUILayout.Button("Build " + this._currentConfiguration.name))
-			{
-				this._currentConfiguration.Build();
+			{				
+				EditorApplication.delayCall += this._currentConfiguration.Build;
 			}
 			GUI.backgroundColor = bg;
 		}
@@ -255,7 +255,7 @@ public class CustomBuilder : EditorWindow
 			this._currentConfigurationDirty |= this._currentConfiguration.OnGUI();
 		}
 		EditorGUILayout.EndScrollView();
-	       
+		   
 		if (this._currentConfiguration != null)
 		{
 			var modules = CustomBuilderModule.GetModules();
