@@ -45,10 +45,14 @@ namespace CustomBuilderModules
 }
 ```
 
+Builder module events are fired in the same order the modules are arranged in configuration if not stated otherwise.
+
 * **OnBeforeBuild** - is fired first after the main configuration is set but before the build.
 * **OnBuild** - is fired before the build but after all *OnBeforeBuild* are called. It can be used to check the options set by other modules in *OnBeforeBuild*.
-* **OnAfterBuild** - is fired after the build is done.
+* **OnAfterBuild** - is fired after the build is done. Is not fired when the build fails.
+* **OnCleanupBuild** - is fired after the build is done and after all *OnAfterBuild* calls. Is fired even when the build fails. Fired in reverse order.
 
+The following methods are not build events but still can be overriden to suit your needs.
 
 * **FromJson** - is used to load module settings from stored data.
 * **ToJson** - is used to store module settings to JSON file.

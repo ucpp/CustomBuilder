@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Text;
 using System.ComponentModel;
 using System.IO;
+using System;
 
 
 [Browsable(false)]
@@ -47,9 +48,9 @@ public sealed class CustomBuilderMissingModule : CustomBuilderModule
 }
 
 // Fucking workaround because original BuildOptions is full of crap!
+[Flags]
 public enum CustomBuilderBuildOptions
 {
-	None = 0,
 	Development = 1,
 	Unknown = 2,
 	AutoRunPlayer = 4,
@@ -88,7 +89,7 @@ public class CustomBuilderConfiguration
 		json["path"] = this.buildPath ?? "";
 		json["buildTarget"] = this.buildTarget.ToString();
 
-		if (this.buildOptions != CustomBuilderBuildOptions.None)
+		if (this.buildOptions != 0)
 		{
 			var options = new JObject();
 
@@ -125,7 +126,7 @@ public class CustomBuilderConfiguration
 	{
 		this.buildPath = null;
 		this.buildTarget = (BuildTarget)0;
-		this.buildOptions = CustomBuilderBuildOptions.None;
+		this.buildOptions = 0;
 
 		if (json == null)
 		{
@@ -194,29 +195,30 @@ public class CustomBuilderConfiguration
 		foreach (var m in this._modules)
 		{
 			var info = CustomBuilderModule.GetModule(m.name);
+			EditorGUILayout.BeginHorizontal();
 			if (info == null)
 			{
 				EditorGUILayout.LabelField(m.name != null ? "Missing module: " + m.name : "Missing module");
 			}
 			else
 			{
-				EditorGUILayout.BeginHorizontal();
 				m.isCollapsed = !EditorGUILayout.Foldout(!m.isCollapsed, info.description);
-				if (GUILayout.Button("Delete"))
+			}
+			if (GUILayout.Button("Delete"))
+			{
+				if (moduleToRemove == null)
 				{
-					if (moduleToRemove == null)
-					{
-						moduleToRemove = new List<CustomBuilderModule>(1);
-					}
-					moduleToRemove.Add(m);
+					moduleToRemove = new List<CustomBuilderModule>(1);
 				}
-				EditorGUILayout.EndHorizontal();
-				if (!m.isCollapsed)
-				{
-					EditorGUI.indentLevel++;
-					m.OnGUI();
-					EditorGUI.indentLevel--;
-				}
+				moduleToRemove.Add(m);
+			}
+			EditorGUILayout.EndHorizontal();
+				
+			if (info != null && !m.isCollapsed)
+			{
+				EditorGUI.indentLevel++;
+				m.OnGUI();
+				EditorGUI.indentLevel--;
 			}
 		}
 			
@@ -259,16 +261,47 @@ public class CustomBuilderConfiguration
 		}
 
 		var dir = Path.GetDirectoryName(config.buildPath);
-		if (!Directory.Exists(dir))
+		if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
 		{
 			Directory.CreateDirectory(dir);
 		}
 
-		BuildPipeline.BuildPlayer(config.scenes.ToArray(), config.buildPath, config.buildTarget, config.buildOptions);
-
-		foreach (var m in this._modules)
+		try
 		{
-			m.OnAfterBuild(config);
+			string error = BuildPipeline.BuildPlayer(config.scenes.ToArray(), config.buildPath, config.buildTarget, config.buildOptions);
+			if (!string.IsNullOrEmpty(error))
+			{
+				config.error = error;
+			}
+		}
+		catch (Exception ex)
+		{
+			config.error = ex.Message;
+		}
+
+		try
+		{
+			if (config.error == null)
+			{
+				foreach (var m in this._modules)
+				{
+					m.OnAfterBuild(config);			
+				}
+			}
+		}
+		finally
+		{
+			for (int i = this._modules.Count - 1; i >= 0; i--)
+			{
+				try
+				{
+					this._modules[i].OnCleanupBuild(config);
+				}
+				catch (Exception ex)
+				{
+					Debug.LogException(ex);
+				}
+			}
 		}
 	}
 }

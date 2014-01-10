@@ -97,6 +97,10 @@ public abstract class CustomBuilderModule
 	{
 	}
 
+	public virtual void OnCleanupBuild(CustomBuildConfiguration config)
+	{
+	}
+
 	private static Dictionary<string, CustomBuilderModuleInfo> LoadModules()
 	{
 		var result = new Dictionary<string, CustomBuilderModuleInfo>();

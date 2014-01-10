@@ -4,14 +4,15 @@ using UnityEditor;
 
 public class CustomBuildConfiguration
 {
-	private Dictionary<string, object> _parameters;
+	private Dictionary<object, object> _parameters;
 	private List<string> _scenes = new List<string>();
 
-	public Dictionary<string, object> parameters 
+	public string error { get; set; }
+	public Dictionary<object, object> parameters 
 	{
 		get
 		{
-			return this._parameters ?? (this._parameters = new Dictionary<string, object>());
+			return this._parameters ?? (this._parameters = new Dictionary<object, object>());
 		}
 	}
 	public List<string> scenes
